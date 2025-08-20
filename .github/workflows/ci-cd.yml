@@ -1,4 +1,4 @@
-name: Build and Deploy
+name: Build, Test, and Docker Push
 
 on:
   pull_request:
@@ -30,8 +30,9 @@ jobs:
       - name: Run tests
         run: npm run test
 
-  # Docker build and artifact extraction
-  build-image:
+  # Docker Build & Push
+  docker-build-push:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -40,34 +41,39 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Set image tag
-        id: vars
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Set tags and profile
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "TAG=${{ github.event.repository.name }}:${{ github.event.pull_request.number }}" >> $GITHUB_ENV
-            echo "🔖 Using PR tag: ${{ github.event.repository.name }}:${{ github.event.pull_request.number }}"
-          else
-            echo "TAG=${{ github.event.repository.name }}:${{ github.sha }}" >> $GITHUB_ENV
-            echo "🔖 Using commit tag: ${{ github.event.repository.name }}:${{ github.sha }}"
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "IMAGE_TAG=latest" >> $GITHUB_ENV
+            echo "PROFILE=prod" >> $GITHUB_ENV
+          elif [ "${{ github.ref_name }}" = "dev" ]; then
+            echo "IMAGE_TAG=dev" >> $GITHUB_ENV
+            echo "PROFILE=dev" >> $GITHUB_ENV
           fi
+          echo "COMMIT_TAG=${{ github.sha }}" >> $GITHUB_ENV
+          echo "🔖 Tags will be: ${{ secrets.DOCKER_USERNAME }}/fusion-erp-api:$IMAGE_TAG and :$COMMIT_TAG"
 
       - name: Build Docker image
         run: |
-          echo "🚀 Building Docker image with tag: $TAG"
-          docker build -f Dockerfile -t $TAG .
+          echo "🚀 Building Docker image for profile: $PROFILE"
+          docker build \
+            --build-arg PROFILE=$PROFILE \
+            -f Dockerfile \
+            -t ${{ secrets.DOCKER_USERNAME }}/fusion-erp-api:$IMAGE_TAG \
+            -t ${{ secrets.DOCKER_USERNAME }}/fusion-erp-api:$COMMIT_TAG .
 
-      - name: Run container to produce build artifacts
+      - name: Push Docker images
         run: |
-          echo "📦 Running container to copy build artifacts..."
-          mkdir -p build
-          docker run --rm -v $(pwd)/build:/app/build $TAG
-          echo "✅ Artifacts copied to ./build directory"
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-build
-          path: build
+          echo "📤 Pushing Docker images..."
+          docker push ${{ secrets.DOCKER_USERNAME }}/fusion-erp-api:$IMAGE_TAG
+          docker push ${{ secrets.DOCKER_USERNAME }}/fusion-erp-api:$COMMIT_TAG
+          echo "✅ Images pushed successfully!"
 
       - name: Clean up dangling images/containers
         run: |
