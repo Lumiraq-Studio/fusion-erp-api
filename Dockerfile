@@ -6,7 +6,7 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 
-# Build artifacts (adjust if Angular/NestJS/etc.)
+# Build artifacts
 RUN npm run build
 
 CMD ["echo", "Build complete!"]
