@@ -1,4 +1,4 @@
-name: Build, Test & Deploy
+name: Build and Deploy
 
 on:
   pull_request:
@@ -41,12 +41,11 @@ jobs:
           docker image prune -af
           docker container prune -f
 
-  # 2️⃣ Push to Docker Hub & Deploy
+  # 2️⃣ Push to Docker Hub on Merge/Push
   push-to-docker:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    env:
-      DEPLOY_ENV: ${{ github.ref_name == 'main' && 'production' || 'development' }}
+    environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -62,74 +61,41 @@ jobs:
       - name: Run tests
         run: npm run test
 
-      - name: Debug Docker Username
-        run: echo "Docker username: ${{ secrets.DOCKER_USERNAME }}"
-
       - name: Login to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v2
         with:
-          registry: docker.io
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build Docker image
         run: |
+          # Extract branch name
           BRANCH=${GITHUB_REF#refs/heads/}
+          # Set tag based on branch
           if [ "$BRANCH" = "main" ]; then
             TAG="lumiraqdev/navoda-erp-api:latest"
           else
             TAG="lumiraqdev/navoda-erp-api:dev"
           fi
           echo "Docker tag: $TAG"
-          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "TAG=$TAG" >> $GITHUB_ENV   # Save for later steps
           docker build -t $TAG .
 
       - name: Push Docker image to Docker Hub
         run: |
           docker push ${{ env.TAG }}
 
-      - name: Test SSH connection
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: 22
-          script: |
-            echo "SSH login successful!"
-            whoami
-            hostname
+      - name: Run Docker container
+        run: |
+          docker rm -f navoda-erp-api || true
+          docker run -d \
+            --name navoda-erp-api \
+            -p 3000:3000 \
+            -e NODE_ENV=${{ vars.NODE_ENV }} \
+            -e APP_PROFILE=${{ vars.PROFILE }} \
+            ${{ env.TAG }}
 
-      - name: Deploy Docker container to server
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: 22
-          script: |
-            echo "Deploying ${{ env.TAG }}..."
-            docker rm -f navoda-erp-api || true
-            docker pull ${{ env.TAG }}
-            docker run -d \
-              --name navoda-erp-api \
-              -p 3000:3000 \
-              -e NODE_ENV=${DEPLOY_ENV} \
-              -e APP_PROFILE=${{ vars.PROFILE }} \
-              ${{ env.TAG }}
-            docker image prune -af
-            docker container prune -f
-            echo "Deployment complete!"
-
-      - name: Verify Deployment
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: 22
-          script: |
-            echo "Checking container status..."
-            docker ps | grep navoda-erp-api
-            curl -f http://localhost:3000/health || exit 1
-            echo "Container is running and healthy!"
+      - name: Clean up dangling images/containers
+        run: |
+          docker image prune -af
+          docker container prune -f
