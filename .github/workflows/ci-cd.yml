@@ -73,9 +73,9 @@ jobs:
           BRANCH=${GITHUB_REF#refs/heads/}
           # Set tag based on branch
           if [ "$BRANCH" == "main" ]; then
-            TAG="your-dockerhub-username/navoda-erp-api:latest"
+            TAG="lumiraqdev/navoda-erp-api:latest"
           else
-            TAG="your-dockerhub-username/navoda-erp-api:dev"
+            TAG="lumiraqdev/navoda-erp-api:dev"
           fi
           echo "Docker tag: $TAG"
           docker build -t $TAG .
