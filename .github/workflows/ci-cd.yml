@@ -1,42 +1,29 @@
-name: CI/CD
+name: Build and Deploy (Main)
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
-      - dev
       - main
 
 jobs:
-  deploy:
+  # PR Build & Test only
+  pr-build:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    # Set environment per branch
-    environment: ${{ github.ref == 'refs/heads/dev' && 'development' || github.ref == 'refs/heads/main' && 'production' }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run tests
-        run: npm test
-
-      - name: Build project
-        run: npm run build
-
-      - name: Deploy
-        run: |
-          if [ "${GITHUB_REF}" = "refs/heads/dev" ]; then
-            echo "Deploying to development"
-          elif [ "${GITHUB_REF}" = "refs/heads/main" ]; then
-            echo "Deploying to production"
-          fi
-        env:
-          DEV_PORT: 3001
-          PROD_PORT: 3000
+        run: npm run test
