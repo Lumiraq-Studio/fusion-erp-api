@@ -45,7 +45,8 @@ jobs:
   push-to-docker:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
+    env:
+      DEPLOY_ENV: ${{ github.ref_name == 'main' && 'production' || 'development' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -113,7 +114,7 @@ jobs:
             docker run -d \
               --name navoda-erp-api \
               -p 3000:3000 \
-              -e NODE_ENV=${{ github.ref_name == 'main' && 'production' || 'development' }} \
+              -e NODE_ENV=${DEPLOY_ENV} \
               -e APP_PROFILE=${{ vars.PROFILE }} \
               ${{ env.TAG }}
             docker image prune -af
