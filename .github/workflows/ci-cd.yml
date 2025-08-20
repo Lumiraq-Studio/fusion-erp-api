@@ -30,7 +30,7 @@ jobs:
       - name: Run tests
         run: npm run test
 
-      - name: Build Docker image (PR only)
+      - name: Build Docker image for PR
         run: |
           TAG="navoda-erp-api:pr-${{ github.event.pull_request.number }}"
           docker build -t $TAG .
@@ -69,12 +69,21 @@ jobs:
 
       - name: Build Docker image
         run: |
-          TAG="your-dockerhub-username/navoda-erp-api:${{ github.ref_name }}"
+          # Extract branch name
+          BRANCH=${GITHUB_REF#refs/heads/}
+          # Set tag based on branch
+          if [ "$BRANCH" = "main" ]; then
+            TAG="lumiraqdev/navoda-erp-api:latest"
+          else
+            TAG="lumiraqdev/navoda-erp-api:dev"
+          fi
+          echo "Docker tag: $TAG"
+          echo "TAG=$TAG" >> $GITHUB_ENV   # Save for later steps
           docker build -t $TAG .
 
-      - name: Push Docker image
+      - name: Push Docker image to Docker Hub
         run: |
-          docker push $TAG
+          docker push ${{ env.TAG }}
 
       - name: Run Docker container
         run: |
@@ -84,7 +93,7 @@ jobs:
             -p 3000:3000 \
             -e NODE_ENV=${{ vars.NODE_ENV }} \
             -e APP_PROFILE=${{ vars.PROFILE }} \
-            $TAG
+            ${{ env.TAG }}
 
       - name: Clean up dangling images/containers
         run: |
