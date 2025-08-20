@@ -11,7 +11,7 @@ on:
       - dev
 
 jobs:
-  # 1️⃣ PR Build & Clean
+  # 1️⃣ PR Build & Clean test
   pr-build:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
