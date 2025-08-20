@@ -2,6 +2,7 @@ services:
   navoda-erp-api-dev:
     container_name: navoda-erp-api-dev
     restart: always
+    image: lumiraqdev/navoda-erp-api:dev
     build:
       context: .
       dockerfile: Dockerfile
@@ -16,6 +17,7 @@ services:
   navoda-erp-api-prod:
     container_name: navoda-erp-api-prod
     restart: always
+    image: lumiraqdev/navoda-erp-api:latest
     build:
       context: .
       dockerfile: Dockerfile

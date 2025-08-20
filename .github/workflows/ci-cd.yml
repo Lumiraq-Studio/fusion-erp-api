@@ -91,9 +91,6 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
-            echo "Logging in to Docker Hub..."
-            echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-
             BRANCH="${GITHUB_REF#refs/heads/}"
             if [ "$BRANCH" = "main" ]; then
               PROFILE="production"
@@ -101,14 +98,15 @@ jobs:
               PROFILE="development"
             fi
 
+            echo "Logging in to Docker Hub..."
+            echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
             echo "Pulling latest images..."
-            docker-compose -f docker-compose.yml pull
+            docker-compose --profile $PROFILE pull
 
-            echo "Stopping old containers for profile $PROFILE..."
-            docker-compose -f docker-compose.yml --profile $PROFILE down
-
-            echo "Starting containers with profile $PROFILE..."
-            docker-compose -f docker-compose.yml --profile $PROFILE up -d --build
+            echo "Starting containers..."
+            docker-compose --profile $PROFILE up --build -d
 
             echo "Listing running containers..."
             docker ps
+      
