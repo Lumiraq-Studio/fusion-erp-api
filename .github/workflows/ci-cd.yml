@@ -1,0 +1,31 @@
+name: Deploy After Merge
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Build & Test
+        run: |
+          npm install
+          npm test
+          npm run build
+
+      - name: Deploy to Development
+        if: github.ref == 'refs/heads/dev'
+        environment: development
+        run: docker compose --profile development up -d --build
+
+      - name: Deploy to Production
+        if: github.ref == 'refs/heads/main'
+        environment: production
+        run: docker compose --profile production up -d --build
