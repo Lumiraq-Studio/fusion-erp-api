@@ -1,34 +1,12 @@
-# ---------- BUILD STAGE ----------
-FROM node:lts-slim AS builder
+# Dockerfile.build
+FROM node:20-alpine
 
 WORKDIR /app
-
-# Copy package.json and package-lock.json
 COPY package*.json ./
-
-# Install all dependencies including dev
 RUN npm ci
-
-# Copy source code
 COPY . .
 
-# Build the NestJS application
+# Build artifacts (adjust if Angular/NestJS/etc.)
 RUN npm run build
 
-# ---------- PRODUCTION STAGE ----------
-FROM node:lts-slim AS production
-
-WORKDIR /app
-
-# Copy only production dependencies
-COPY package*.json ./
-RUN npm ci --omit=dev
-
-# Copy built application from builder
-COPY --from=builder /app/dist ./dist
-
-# Expose port
-EXPOSE 3000
-
-# Start the application
-CMD ["node", "dist/main.js"]
+CMD ["echo", "Build complete!"]

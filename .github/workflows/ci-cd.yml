@@ -1,44 +1,92 @@
-name: Deploy After Merge
+name: Build and Deploy
 
 on:
+  pull_request:
+    branches:
+      - main
+      - dev
   push:
     branches:
-      - dev
       - main
+      - dev
 
 jobs:
-  deploy:
+  # 1️⃣ PR Build & Clean
+  pr-build:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Use Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run tests
         run: npm run test
-        uses: actions/checkout@v3
 
-      - name: Build & Test
+      - name: Build Docker image (PR only)
         run: |
-          npm install
-          npm test
-          npm run build
+          TAG="navoda-erp-api:pr-${{ github.event.pull_request.number }}"
+          docker build -t $TAG .
+          echo "Docker image built for PR: $TAG"
 
-      - name: Deploy to Development
-        if: github.ref == 'refs/heads/dev'
-        environment: development
-        run: docker compose --profile development up -d --build
+      - name: Clean up Docker images
+        run: |
+          docker image prune -af
+          docker container prune -f
 
-      - name: Deploy to Production
-        if: github.ref == 'refs/heads/main'
-        environment: production
-        run: docker compose --profile production up -d --build
+  # 2️⃣ Push to Docker Hub on Merge/Push
+  push-to-docker:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build Docker image
+        run: |
+          TAG="your-dockerhub-username/navoda-erp-api:${{ github.ref_name }}"
+          docker build -t $TAG .
+
+      - name: Push Docker image
+        run: |
+          docker push $TAG
+
+      - name: Run Docker container
+        run: |
+          docker rm -f navoda-erp-api || true
+          docker run -d \
+            --name navoda-erp-api \
+            -p 3000:3000 \
+            -e NODE_ENV=${{ vars.NODE_ENV }} \
+            -e APP_PROFILE=${{ vars.PROFILE }} \
+            $TAG
+
+      - name: Clean up dangling images/containers
+        run: |
+          docker image prune -af
+          docker container prune -f
