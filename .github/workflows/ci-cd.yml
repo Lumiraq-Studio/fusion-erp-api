@@ -11,8 +11,27 @@ on:
       - dev
 
 jobs:
+  # PR Build & Test only
+  pr-build:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test
+
+  # Docker build and artifact extraction
   build-image:
-    if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -35,7 +54,7 @@ jobs:
       - name: Build Docker image
         run: |
           echo "🚀 Building Docker image with tag: $TAG"
-          docker build -f Dockerfile.build -t $TAG .
+          docker build -f Dockerfile -t $TAG .
 
       - name: Run container to produce build artifacts
         run: |
@@ -43,6 +62,12 @@ jobs:
           mkdir -p build
           docker run --rm -v $(pwd)/build:/app/build $TAG
           echo "✅ Artifacts copied to ./build directory"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-build
+          path: build
 
       - name: Clean up dangling images/containers
         run: |
