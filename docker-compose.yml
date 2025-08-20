@@ -1,14 +1,28 @@
 services:
-  nest-api-prod:
-    container_name: nest-api-prod
-    image: sadeeee/nest-api-ci-cd-pipeline:latest
-    restart: unless-stopped
+  navoda-erp-api-dev:
+    container_name: navoda-erp-api-dev
+    restart: always
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "${PORT}:3000"
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV}
+      APP_PROFILE: ${PROFILE}
+    profiles:
+      - development
+
+  navoda-erp-api-prod:
+    container_name: navoda-erp-api-prod
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT}:3000"
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      APP_PROFILE: ${PROFILE}
     profiles:
       - production
