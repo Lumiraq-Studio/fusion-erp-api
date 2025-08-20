@@ -72,18 +72,18 @@ jobs:
           # Extract branch name
           BRANCH=${GITHUB_REF#refs/heads/}
           # Set tag based on branch
-          if [ "$BRANCH" == "main" ]; then
+          if [ "$BRANCH" = "main" ]; then
             TAG="lumiraqdev/navoda-erp-api:latest"
           else
             TAG="lumiraqdev/navoda-erp-api:dev"
           fi
           echo "Docker tag: $TAG"
-          docker build -t $TAG .
           echo "TAG=$TAG" >> $GITHUB_ENV   # Save for later steps
+          docker build -t $TAG .
 
       - name: Push Docker image to Docker Hub
         run: |
-          docker push $TAG
+          docker push ${{ env.TAG }}
 
       - name: Run Docker container
         run: |
@@ -93,7 +93,7 @@ jobs:
             -p 3000:3000 \
             -e NODE_ENV=${{ vars.NODE_ENV }} \
             -e APP_PROFILE=${{ vars.PROFILE }} \
-            $TAG
+            ${{ env.TAG }}
 
       - name: Clean up dangling images/containers
         run: |
