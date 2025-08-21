@@ -11,7 +11,7 @@ on:
       - dev
 
 jobs:
-  # 1️⃣ PR Build & Clean
+  # 1️⃣ PR Build & Test
   pr-build:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -41,7 +41,7 @@ jobs:
           docker image prune -af
           docker container prune -f
 
-  # 2️⃣ Push to Docker Hub & Deploy on Server
+  # 2️⃣ Push to Docker Hub & Deploy
   push-to-docker:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -82,8 +82,7 @@ jobs:
       - name: Push Docker image to Docker Hub
         run: docker push ${{ env.TAG }}
 
-      # 🔑 Deploy via Docker Compose on Server
-      - name: Deploy via Docker Compose
+      - name: Deploy via Docker Compose on Server
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_IP }}
@@ -101,12 +100,14 @@ jobs:
             echo "Logging in to Docker Hub..."
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-            echo "Pulling latest images..."
+            echo "Stopping old containers for $PROFILE..."
+            docker-compose --profile $PROFILE down
+
+            echo "Pulling latest Docker image..."
             docker-compose --profile $PROFILE pull
 
             echo "Starting containers..."
-            docker-compose --profile $PROFILE up --build -d
+            docker-compose --profile $PROFILE up --detach --build
 
             echo "Listing running containers..."
             docker ps
-      
