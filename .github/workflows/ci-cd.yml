@@ -11,7 +11,7 @@ on:
       - dev
 
 jobs:
-  # 1️⃣ PR Build & Clean
+  # 1️⃣ PR Build & Test
   pr-build:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -41,7 +41,7 @@ jobs:
           docker image prune -af
           docker container prune -f
 
-  # 2️⃣ Push to Docker Hub & Deploy on Server
+  # 2️⃣ Push & Deploy Dev/Prod
   push-to-docker:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -79,10 +79,9 @@ jobs:
           echo "TAG=$TAG" >> $GITHUB_ENV
           docker build -t $TAG .
 
-      - name: Push Docker image to Docker Hub
+      - name: Push Docker image
         run: docker push ${{ env.TAG }}
 
-      # 🔑 Deploy via Docker Compose on Server test
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
