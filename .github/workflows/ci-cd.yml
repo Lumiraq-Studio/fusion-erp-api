@@ -83,7 +83,7 @@ jobs:
         run: docker push ${{ env.TAG }}
 
       # 🔑 Deploy via Docker Compose on Server
-      - name: Deploy via Docker Compose
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_IP }}
@@ -96,19 +96,24 @@ jobs:
 
             BRANCH="${GITHUB_REF#refs/heads/}"
             if [ "$BRANCH" = "main" ]; then
-              PROFILE="production"
+              IMAGE_NAME="lumiraqdev/navoda-erp-api:latest"
+              CONTAINER_NAME="navoda-erp-api-prod"
+              PORT="3000:3000"
             else
-              PROFILE="development"
+              IMAGE_NAME="lumiraqdev/navoda-erp-api:dev"
+              CONTAINER_NAME="navoda-erp-api-dev"
+              PORT="3001:3000"
             fi
 
-            echo "Pulling latest images..."
-            docker-compose -f docker-compose.yml pull
+            echo "Pulling latest Docker image: $IMAGE_NAME"
+            docker pull $IMAGE_NAME
 
-            echo "Stopping old containers for profile $PROFILE..."
-            docker-compose -f docker-compose.yml --profile $PROFILE down
+            echo "Stopping old container (if exists): $CONTAINER_NAME"
+            docker stop $CONTAINER_NAME || true
+            docker rm $CONTAINER_NAME || true
 
-            echo "Starting containers with profile $PROFILE..."
-            docker-compose -f docker-compose.yml --profile $PROFILE up -d --build
+            echo "Starting new container: $CONTAINER_NAME"
+            docker run -d --restart unless-stopped --name $CONTAINER_NAME -p $PORT $IMAGE_NAME
 
-            echo "Listing running containers..."
+            echo "Deployment completed. Running containers:"
             docker ps
