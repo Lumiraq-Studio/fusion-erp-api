@@ -82,7 +82,7 @@ jobs:
       - name: Push Docker image to Docker Hub
         run: docker push ${{ env.TAG }}
 
-      # 🔑 Deploy via Docker Compose on Server
+      # 🔑 Deploy via Docker Compose on Server test
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
