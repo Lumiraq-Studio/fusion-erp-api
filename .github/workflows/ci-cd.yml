@@ -41,7 +41,7 @@ jobs:
           docker image prune -af
           docker container prune -f
 
-  # 2️⃣ Push to Docker Hub on Merge/Push
+  # 2️⃣ Push to Docker Hub & Deploy on Server
   push-to-docker:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -69,33 +69,51 @@ jobs:
 
       - name: Build Docker image
         run: |
-          # Extract branch name
           BRANCH=${GITHUB_REF#refs/heads/}
-          # Set tag based on branch
           if [ "$BRANCH" = "main" ]; then
             TAG="lumiraqdev/navoda-erp-api:latest"
           else
             TAG="lumiraqdev/navoda-erp-api:dev"
           fi
           echo "Docker tag: $TAG"
-          echo "TAG=$TAG" >> $GITHUB_ENV   # Save for later steps
+          echo "TAG=$TAG" >> $GITHUB_ENV
           docker build -t $TAG .
 
       - name: Push Docker image to Docker Hub
-        run: |
-          docker push ${{ env.TAG }}
+        run: docker push ${{ env.TAG }}
 
-      - name: Run Docker container
-        run: |
-          docker rm -f navoda-erp-api || true
-          docker run -d \
-            --name navoda-erp-api \
-            -p 3000:3000 \
-            -e NODE_ENV=${{ vars.NODE_ENV }} \
-            -e APP_PROFILE=${{ vars.PROFILE }} \
-            ${{ env.TAG }}
+      # 🔑 Deploy via Docker Compose on Server
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          script: |
+            echo "Logging in to Docker Hub..."
+            echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-      - name: Clean up dangling images/containers
-        run: |
-          docker image prune -af
-          docker container prune -f
+            BRANCH="${GITHUB_REF#refs/heads/}"
+            if [ "$BRANCH" = "main" ]; then
+              IMAGE_NAME="lumiraqdev/navoda-erp-api:latest"
+              CONTAINER_NAME="navoda-erp-api-prod"
+              PORT="3000:3000"
+            else
+              IMAGE_NAME="lumiraqdev/navoda-erp-api:dev"
+              CONTAINER_NAME="navoda-erp-api-dev"
+              PORT="3001:3000"
+            fi
+
+            echo "Pulling latest Docker image: $IMAGE_NAME"
+            docker pull $IMAGE_NAME
+
+            echo "Stopping old container (if exists): $CONTAINER_NAME"
+            docker stop $CONTAINER_NAME || true
+            docker rm $CONTAINER_NAME || true
+
+            echo "Starting new container: $CONTAINER_NAME"
+            docker run -d --restart unless-stopped --name $CONTAINER_NAME -p $PORT $IMAGE_NAME
+
+            echo "Deployment completed. Running containers:"
+            docker ps
